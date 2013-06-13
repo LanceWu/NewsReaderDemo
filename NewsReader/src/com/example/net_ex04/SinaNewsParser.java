@@ -23,7 +23,7 @@ class SinaNews{
 		mTitle = title;
 	}
 	public String getTitle(){
-		return mTitle;
+		return mTitle.trim();
 	}
 	public void setLink(String link){
 		mLink = link;
@@ -35,7 +35,7 @@ class SinaNews{
 		mDscr = dscr;
 	}
 	public String getDscr(){
-		return mDscr;
+		return mDscr.trim();
 	}
 }
 public class SinaNewsParser {

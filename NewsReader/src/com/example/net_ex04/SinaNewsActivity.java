@@ -18,15 +18,14 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpConnectionParams;
 
-import android.annotation.SuppressLint;
 import android.app.ActionBar;
 import android.app.ActionBar.Tab;
 import android.app.ActionBar.TabListener;
-import android.app.Activity;
 import android.app.FragmentTransaction;
-import android.app.TabActivity;
 import android.content.Context;
-import android.graphics.Color;
+import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -39,16 +38,14 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
 import android.widget.BaseAdapter;
-import android.widget.ListView;
-import android.widget.TabHost;
-import android.widget.TabHost.OnTabChangeListener;
 import android.widget.TextView;
+import android.widget.Toast;
 
-@SuppressWarnings("deprecation")
 public class SinaNewsActivity extends FragmentActivity implements onPullRefreshListener{
 	protected static final String TAG = "SinaNewsActivity";
-	private TabHost myTabHost;
 	private ViewPager viewPager;
 	//private ListView listView;
 	//List<SinaNews> sinaNewsArr;
@@ -134,6 +131,13 @@ public class SinaNewsActivity extends FragmentActivity implements onPullRefreshL
 		getActionBar().addTab(tab);
 	}	
 	
+	private boolean isOpenNetwork() {  
+		ConnectivityManager connManager = (ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE);  
+	    if(connManager.getActiveNetworkInfo() != null) {  
+		        return connManager.getActiveNetworkInfo().isAvailable();  
+		    }  		  
+		return false;  
+	}  
     private class MyViewPagerAdapter extends FragmentPagerAdapter{
 
 		public MyViewPagerAdapter(FragmentManager fm, List<Fragment> fragments) {
@@ -167,7 +171,7 @@ public class SinaNewsActivity extends FragmentActivity implements onPullRefreshL
 		// TODO Auto-generated method stub
 		mListView = listView;
 		String path = getFilesDir().getAbsolutePath() + File.separator + fileName;
-		new DownloadTask().execute(url, path);		
+		new DownloadTask(this).execute(url, path);		
 	}
 	
 	
@@ -175,18 +179,40 @@ public class SinaNewsActivity extends FragmentActivity implements onPullRefreshL
 	class DownloadTask extends AsyncTask<String, Integer, String>{
 		private static final int REQUEST_TIMEOUT = 10 * 1000;
 		private static final int SO_TIMEOUT = 10 * 1000;
-		List<SinaNews> sinaNewsArr = null;
+		private List<SinaNews> sinaNewsArr = null;
+		private Context mContext = null;
+		
+		public DownloadTask(Context context){
+			mContext = context;
+		}
     	@Override
 		protected void onPostExecute(String result) {
 			// TODO Auto-generated method stub
 			super.onPostExecute(result);
-			if(result.equals("OK")){
-		   		MyAdapter myAdapter = new MyAdapter(getLayoutInflater());
-	    		mListView.setAdapter(myAdapter);
-				mListView.invalidate();
-				mListView.onRefreshComplete();
+			if(result != null){
+				if(result.equals("OK")){
+			   		MyAdapter myAdapter = new MyAdapter(getLayoutInflater());
+		    		mListView.setAdapter(myAdapter);
+		    		mListView.setOnItemClickListener(new OnItemClickListener(){
+						@Override
+						public void onItemClick(AdapterView<?> arg0, View arg1,
+								int arg2, long arg3) {
+							// TODO Auto-generated method stub
+							if(arg2 > 0){
+								Intent intent = new Intent("android.intent.action.VIEW", 
+										Uri.parse(sinaNewsArr.get(arg2).getLink()));
+								startActivity(intent);
+							}
+		
+						}
+		    			
+		    		});
+					mListView.invalidate();
+					mListView.onRefreshComplete();
+				}
 			}
 			else{
+				Toast.makeText(mContext, "pleast check the network connection", Toast.LENGTH_LONG).show();
 				mListView.onRefreshComplete();
 			}
 		}
@@ -198,6 +224,9 @@ public class SinaNewsActivity extends FragmentActivity implements onPullRefreshL
     	@Override
     	protected String doInBackground(String... params) {
     		// TODO Auto-generated method stub
+    		if(!isOpenNetwork()){
+    			return null;
+    		}
     		HttpGet httpRequest = new HttpGet(params[0]);
     		BasicHttpParams httpParams = new BasicHttpParams();
 			HttpConnectionParams.setConnectionTimeout(httpParams, REQUEST_TIMEOUT);
@@ -286,7 +315,7 @@ public class SinaNewsActivity extends FragmentActivity implements onPullRefreshL
 				TextView textView1 = (TextView)view.findViewById(R.id.title);
 				textView1.setText(sinaNewsArr.get(position).getTitle());
 				TextView textView2 = (TextView)view.findViewById(R.id.description);
-				textView1.setText(sinaNewsArr.get(position).getDscr());
+				textView2.setText(sinaNewsArr.get(position).getDscr());
 				return view;
 			}
 		

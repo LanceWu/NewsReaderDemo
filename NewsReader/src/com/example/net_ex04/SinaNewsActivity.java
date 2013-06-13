@@ -10,10 +10,13 @@ import java.util.List;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpConnectionParams;
 
 import android.annotation.SuppressLint;
 import android.app.ActionBar;
@@ -170,15 +173,22 @@ public class SinaNewsActivity extends FragmentActivity implements onPullRefreshL
 	
 	//put the download and parse work in AsyncTask
 	class DownloadTask extends AsyncTask<String, Integer, String>{
+		private static final int REQUEST_TIMEOUT = 10 * 1000;
+		private static final int SO_TIMEOUT = 10 * 1000;
 		List<SinaNews> sinaNewsArr = null;
     	@Override
 		protected void onPostExecute(String result) {
 			// TODO Auto-generated method stub
 			super.onPostExecute(result);
-	   		MyAdapter myAdapter = new MyAdapter(getLayoutInflater());
-    		mListView.setAdapter(myAdapter);
-			mListView.invalidate();
-			mListView.onRefreshComplete();
+			if(result.equals("OK")){
+		   		MyAdapter myAdapter = new MyAdapter(getLayoutInflater());
+	    		mListView.setAdapter(myAdapter);
+				mListView.invalidate();
+				mListView.onRefreshComplete();
+			}
+			else{
+				mListView.onRefreshComplete();
+			}
 		}
 
 		public DownloadTask() {
@@ -189,12 +199,14 @@ public class SinaNewsActivity extends FragmentActivity implements onPullRefreshL
     	protected String doInBackground(String... params) {
     		// TODO Auto-generated method stub
     		HttpGet httpRequest = new HttpGet(params[0]);
-    		HttpClient httpClient = new DefaultHttpClient();
+    		BasicHttpParams httpParams = new BasicHttpParams();
+			HttpConnectionParams.setConnectionTimeout(httpParams, REQUEST_TIMEOUT);
+			HttpConnectionParams.setSoTimeout(httpParams, SO_TIMEOUT);
+    		HttpClient httpClient = new DefaultHttpClient(httpParams);
     		try{
     			HttpResponse httpResponse = httpClient.execute(httpRequest);
+    			if(httpResponse.getStatusLine().getStatusCode() == HttpStatus.SC_OK){
     			HttpEntity entity = httpResponse.getEntity();
-    			long length = entity.getContentLength();
-    			//progressBar.setMax((int)length);
     			InputStream inputStream = entity.getContent();
     			byte[] b = new byte[1024];
     			int readedLength = -1;
@@ -205,23 +217,25 @@ public class SinaNewsActivity extends FragmentActivity implements onPullRefreshL
     			   file.createNewFile();
     			}
     			OutputStream outputStream = new FileOutputStream(file);
-    			int count = 0;
     			while((readedLength = inputStream.read(b)) != -1){
     				outputStream.write(b, 0, readedLength);
-    				count += readedLength;
-    				publishProgress(count);
     			}
     			
+	    			//parse the rss
+	    			SinaNewsParser parser= new SinaNewsParser(params[1]);
+	        		try {
+						sinaNewsArr = parser.parser();
+					} catch (Exception e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+	        		if(sinaNewsArr != null){
+	        			return "OK";
+	        		}
+    			}
     		}catch(ClientProtocolException e){
     			e.printStackTrace();
     		}catch(IOException e){
-    			e.printStackTrace();
-    		}
-            SinaNewsParser parser= new SinaNewsParser(params[1]);
-    		try {
-    			sinaNewsArr = parser.parser();
-    		} catch (Exception e) {
-    			// TODO Auto-generated catch block
     			e.printStackTrace();
     		}
  
